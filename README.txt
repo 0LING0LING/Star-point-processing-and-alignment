@@ -1,63 +1,126 @@
-README：
-一个基于astroalign的预处理、清洗并筛选天文图像并将图像星点对齐并叠加的Python项目。该工具可完成背景噪点减除、星点检测、基于大小与形态的筛选，并输出通过质量控制的图像帧。之后可以将图像中的星点进行对齐，并按照多种方式进行叠加。
+# Astroalign-based Preprocessing & Stacking Pipeline
 
-项目结构：
-├── data/              # 原始图像文件夹（FITS, PNG, JPG, TIFF）
-├── darkfield/         # 与原始图像匹配的暗场图像
-├── data_cleaned/      # 输出清洗后图像的文件夹
-├── clean_images.py    # 主处理脚本
-├── model.py           # 点对齐并叠加脚本
-└── README.md          # 本说明文档
+A Python project that preprocesses, cleans, filters, aligns, and stacks astronomical images using **astroalign**. The pipeline performs background subtraction, star (source) detection, morphological & size filtering, and outputs quality‑controlled frames. After cleaning, stars are aligned across frames and the frames can be combined using several stacking methods.
 
----------------------------------------------------------------------------------------------------
+---
 
-环境依赖：
-Python 3.7 或更高版本
-安装依赖包：
+## Project Structure
+
+```
+├── data/              # Raw input images (FITS, PNG, JPG, TIFF)
+├── darkfield/         # Matching dark frames for the raw images
+├── data_cleaned/      # Output folder for cleaned images
+├── clean_images.py    # Main preprocessing / cleaning script
+├── model.py           # Alignment and stacking script
+└── README.md          # This README
+```
+
+---
+
+## Requirements
+
+* Python 3.7 or newer
+
+Install required packages:
+
+```bash
 pip install numpy astroalign astropy pillow sep scipy
+```
 
----------------------------------------------------------------------------------------------------
+---
 
-该项目中包含数据预处理和星点对齐并叠加的功能，其中：
-    1.data_process.py是图像预处理的程序，脚本逐个处理INPUT_DIR中的图像。若为FITS格式，
-    使用astropy.io.fits.getdata读取。若为其他图像格式（如PNG、JPG），使用PIL.Image转为灰度图。
-    若在 DARKFIELD_DIR 中存在匹配名称的暗场图像，则进行像素级减除。
-    使用 sep.Background 构建背景模型。将背景从原图中减去，以突显星点。
-    提取图像中心的 1000×1000 区域，用于调试星点检测参数。
-    使用 高斯滤波（σ=1.0） 降低高频噪声。
-    调用 sep.extract 进行星点检测，参数为阈值和最小连通面积。
-    根据 a 和 b 轴计算每个星点的 FWHM。使用中位数与 MAD 统计剔除离群点。
-    计算每个星点的椭率和峰值ADU。若有星点不满足 FWHM、椭率或饱和限制，则丢弃整幅图像。
-    保存清洗图像，将符合要求的图像复制至 OUTPUT_DIR。
+## Getting Started
 
-    配置说明:
-    参数名称	                    描述说明	               默认值
-    INPUT_DIR	         原始图像所在的文件夹路径	       data
-    OUTPUT_DIR	           清洗后图像的输出路径	        data_cleaned
-    DARKFIELD_DIR	          暗场图像路径	         darkfield
-    MIN_STAR_COUNT	    保留图像所需的最小星点数量	       1000
-    THRESHOLD_SIGMA	     星点检测阈值（以 σ 表示）	       10.0
-    FWHM0	           预期星点的 FWHM 值（像素单位）	    3.0
-    ELLIP_MAX	         最大允许的椭率（1 - b/a）	        0.5
-    SATURATION_LIMIT	    饱和前的最大ADU值	           65535
-    MINAREA	              SEP对象最小连通像素面积	        20
-    OUTLIER_MAD_THRESH	用于FWHM异常值剔除的MAD倍数	        3.0
+1. **Prepare directories**: Place your raw images under `data/` and (optionally) matching dark frames under `darkfield/`.
+2. **Configure parameters**: Open `clean_images.py` (or `data_process.py` if present) and adjust the parameters in the configuration section to match your data.
+3. **Run cleaning**: Execute the cleaning script to generate a quality‑filtered dataset in `data_cleaned/`.
+4. **Run alignment & stacking**: Open `model.py`, point it to the cleaned dataset (`data_cleaned/`), and run. The first image in the list is used as the **target** reference; all other frames are registered to this coordinate system.
+5. **Review outputs**: Stacked images and a preview mosaic (showing all stacking modes) are saved under a `results/` folder.
 
----------------------------------------------------------------------------------------------------
+> **Note**: If you use non‑FITS formats (PNG/JPG/TIFF), they are converted to grayscale before processing.
 
-    2.model.py是星点对齐并叠加的程序，里面包含了对齐、堆叠、保存、可视化几个步骤。
-    运行前先确保以已经将原始数据集清理，并把main函数中的路径改为清理后得到的数据集
-    的路径。其中数据列表的第一个图像为target，所有后续的帧都会配准到这张图的坐标系上。
+---
 
-    图像不同的叠加方式如下：
-    Mean Stack - 所有对齐后帧在每个像素位置的算术平均值，噪声随机分布时可显著降低噪声。
-    Median Stack - 每个像素位置取所有帧的中位数，对偶发的亮斑或暗斑有更强的抗干扰能力，但细节平滑程度稍差。
-    Max Stack - 每个像素位置取所有帧的最大值，用来突出明亮瞬态。
-    Min Stack - 每个像素位置取所有帧的最小值，常用于刻画背景或弱光结构，也可检出暗斑。
-    Std Dev - 每个像素位置的标准差，用来显示帧间变化／抖动或瞬态噪声在图像上的分布。
-    Sigma‑Clipped Stack - 对每个像素先做 sigma‑clipping（剔除偏离平均值超过 2.5σ 的像素），
-    然后对剩余值求平均，结合了均值的平滑效果和对极端像素的剔除能力，通常是最干净、最鲁棒的叠加结果。
+## Configuration (Defaults)
 
-    叠加后会生成一个所有叠加方式的预览图，并将原图储存在results文件夹中。
+| Parameter            | Description                                     | Default        |
+| -------------------- | ----------------------------------------------- | -------------- |
+| `INPUT_DIR`          | Folder with raw images                          | `data`         |
+| `OUTPUT_DIR`         | Folder for cleaned images                       | `data_cleaned` |
+| `DARKFIELD_DIR`      | Folder with dark frames                         | `darkfield`    |
+| `MIN_STAR_COUNT`     | Minimum detected stars required to keep a frame | `1000`         |
+| `THRESHOLD_SIGMA`    | Detection threshold (in σ)                      | `10.0`         |
+| `FWHM0`              | Expected star FWHM (pixels)                     | `3.0`          |
+| `ELLIP_MAX`          | Max allowed ellipticity (1 - b/a)               | `0.5`          |
+| `SATURATION_LIMIT`   | Max ADU before saturation                       | `65535`        |
+| `MINAREA`            | Minimum connected pixels for `sep` objects      | `20`           |
+| `OUTLIER_MAD_THRESH` | MAD multiplier for FWHM outlier rejection       | `3.0`          |
 
-MIT License - Use freely in your projects!
+---
+
+## Preprocessing & Cleaning
+
+**Script:** `clean_images.py` (or `data_process.py` in some setups)
+
+* Processes images in `INPUT_DIR` one‑by‑one.
+* **FITS**: reads with `astropy.io.fits.getdata`. **PNG/JPG/TIFF**: loads with `PIL.Image` and converts to grayscale.
+* If a matching dark frame exists in `DARKFIELD_DIR`, subtracts it **pixel‑wise** from the raw image.
+* Builds a background model using **`sep.Background`** and subtracts it to enhance star signals.
+* Optionally extracts the central **1000×1000** region for debugging/tuning detection parameters.
+* Applies **Gaussian smoothing** (`σ = 1.0`) to reduce high‑frequency noise.
+* Runs **`sep.extract`** to detect sources; key parameters are the signal threshold (in σ) and the minimum connected area.
+* Estimates **FWHM** per source from measured semi‑major/minor axes; uses **median** and **MAD** to remove outlier sources.
+* Computes **ellipticity** and **peak ADU** for each detection. If the frame fails FWHM / ellipticity / saturation criteria, the **entire frame** is rejected.
+* Saves cleaned images and copies accepted frames to `OUTPUT_DIR`.
+
+---
+
+## Alignment & Stacking
+
+**Script:** `model.py`
+
+* Load the **cleaned dataset** (ensure `model.py` points to `data_cleaned/`).
+* Use the **first image** as the target reference; register subsequent frames to this coordinate system using **astroalign**.
+* Compute stacked products using the modes listed below.
+* Save per‑mode results and generate a **preview mosaic** summarizing all modes in the `results/` folder.
+
+### Supported stacking modes
+
+* **Mean Stack** — Pixel‑wise arithmetic mean. Good reduction of random noise.
+* **Median Stack** — Pixel‑wise median. Robust to transient bright/dark artifacts; may smooth fine details slightly.
+* **Max Stack** — Pixel‑wise maximum. Emphasizes bright transient events.
+* **Min Stack** — Pixel‑wise minimum. Useful for background estimation or highlighting persistent dark features.
+* **Std Dev** — Pixel‑wise standard deviation. Visualizes frame‑to‑frame variability and transient noise.
+* **Sigma‑Clipped Stack** — For each pixel, drop values more than *Nσ* from the mean (e.g., 2.5σ), then average the remainder. Combines smoothing with robustness to outliers and often produces the cleanest result.
+
+---
+
+## Outputs
+
+* Cleaned, quality‑controlled frames in `data_cleaned/`.
+* Stacked images for each mode in `results/`.
+* A preview image showing all stacking modes side‑by‑side for quick comparison.
+
+---
+
+## Tips & Good Practices
+
+* Ensure dark frames match the **exposure**, **gain/ISO**, **sensor temperature**, and **binning** of the corresponding light frames when possible.
+* Tune `THRESHOLD_SIGMA`, `MINAREA`, and `FWHM0` to your optics and seeing conditions.
+* If too many frames are rejected, consider loosening `ELLIP_MAX` or lowering `THRESHOLD_SIGMA` incrementally.
+* Use the 1000×1000 debug region to quickly iterate on detection parameters before processing full frames.
+
+---
+
+## License
+
+This project is released under the **MIT License** — feel free to use and adapt it in your projects.
+
+---
+
+## Acknowledgments
+
+* [astroalign](https://github.com/toros-astro/astroalign)
+* [Astropy](https://www.astropy.org/)
+* [SEP (Source Extractor as a library)](https://sep.readthedocs.io/)
+* [Pillow](https://python-pillow.org/)
